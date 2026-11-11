@@ -161,7 +161,7 @@ System-wide files from `/etc` and `/usr/local/bin`. **Editing these needs `sudo`
 
 ---
 
-## Notes
+## Personal Note
 
 - **Backups:** a link isn't a backup. To make a real copy that follows the links: `cp -rL ~/ArchConfigs ~/ArchConfigs-backup`.
   That copy *does* include real file contents, so check it for private stuff before sharing it.
