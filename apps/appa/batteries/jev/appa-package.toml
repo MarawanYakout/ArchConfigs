@@ -1,0 +1,13 @@
+schema = 1
+name = "jev"
+description = "An annotator that asks TypeSafe's Jev model for a tool call's label dimensions: what its result contributes and what audience and trust the call requires."
+
+[battery]
+policy = "appa.toml"
+hosts = ["claude-code", "kagent"]
+helpers = []
+benefit = "APPA asks TypeSafe's Jev model for the audience and trust of each tool call that you route to it. With this, APPA can label calls that have no static rule."
+setup = [
+  "Get an API key from TypeSafe. APPA sends every annotated call's name, description, and arguments to https://api.typesafe.ai.",
+  "Route a tool to the annotator in your root config with `annotator = \"jev.tool-call\"`.",
+]

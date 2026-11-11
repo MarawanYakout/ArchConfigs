@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Handy
+GenericName=Speech-to-text assistant
+Comment=Offline speech-to-text dictation (Shift+X)
+Exec=/home/leonardo/aur-builds/handy/Handy.AppImage
+Icon=handy
+Terminal=false
+Categories=Utility;
+StartupWMClass=handy

@@ -1,0 +1,22 @@
+# iPhone USB tether (ipheth driver).
+# Sorts before 20-ethernet.network, so it wins the match and stops the phone
+# from silently becoming the default route the moment it is plugged in.
+#
+# ActivationPolicy=manual: networkd never brings this link up or down on its
+# own. It stays down until `iphone-net on` raises it, then DHCP runs normally.
+
+[Match]
+Driver=ipheth
+
+[Link]
+ActivationPolicy=manual
+RequiredForOnline=no
+
+[Network]
+DHCP=yes
+
+[DHCPv4]
+RouteMetric=100
+
+[IPv6AcceptRA]
+RouteMetric=100

@@ -1,0 +1,18 @@
+#!/bin/bash
+# Desktop-launcher front end for /usr/local/bin/iphone-net.
+# Runs the privileged script over passwordless sudo and reports via notification,
+# because rofi drun launches this with no terminal attached.
+
+action=${1:-toggle}
+
+if out=$(sudo -n /usr/local/bin/iphone-net "$action" 2>&1); then
+    case "$out" in
+        ON*)  icon=network-transmit-receive ;;
+        OFF*) icon=network-offline ;;
+        *)    icon=network-wired ;;
+    esac
+    notify-send -a system -i "$icon" "iPhone Internet" "$out"
+else
+    notify-send -a system -u critical -i dialog-error "iPhone Internet" "${out:-failed}"
+    exit 1
+fi

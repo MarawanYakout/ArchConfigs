@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Mechvibes
+Comment=Mechanical keyboard sound simulator
+Exec="/home/leonardo/aur-builds/mechvipes/mechvibes-3.4.0-x86_64.AppImage" %u
+Icon=mechvibes
+Type=Application
+NoDisplay=true
+MimeType=x-scheme-handler/mechvibes;application/x-mechvibes-theme;

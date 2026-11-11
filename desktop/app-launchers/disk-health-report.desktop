@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Disk Health Report
+GenericName=NVMe self-test summary notification
+Comment=Show the latest self-test results as a notification (green = all good)
+Exec=sudo /usr/local/bin/smartd-selftest-report.sh
+Icon=drive-harddisk
+Terminal=false
+Categories=System;Monitor;
+Keywords=disk;health;smart;nvme;ssd;selftest;report;check;

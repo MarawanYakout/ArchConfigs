@@ -1,0 +1,10 @@
+[Unit]
+Description=Tor status feeder for i3bar (/tmp/torstatus.txt)
+
+[Service]
+ExecStart=%h/.local/bin/torcheck.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

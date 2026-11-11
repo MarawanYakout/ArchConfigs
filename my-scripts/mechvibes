@@ -1,0 +1,6 @@
+#!/bin/sh
+# Mechvibes AppImage needs libxdo.so.3; Arch xdotool now ships libxdo.so.4.
+# Shim dir holds libxdo.so.3 -> /usr/lib/libxdo.so.4.
+DIR=/home/leonardo/aur-builds/mechvipes
+export LD_LIBRARY_PATH="$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$DIR/mechvibes-3.4.0-x86_64.AppImage" "$@"

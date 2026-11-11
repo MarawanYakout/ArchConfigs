@@ -1,0 +1,13 @@
+[Unit]
+Description=Local LLM Server (llama-server on port 8080)
+After=network.target
+
+[Service]
+ExecStart=%h/.local/bin/start-local-llm
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,39 @@
+[Desktop Entry]
+Type=Application
+Name=Odysseus Menu
+GenericName=Odysseus UI Manager
+Comment=Manage Odysseus UI on port 7000 (Start, Stop, Restart, Status, Logs)
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh
+Icon=applications-internet
+Terminal=false
+Categories=Utility;Development;Network;
+Keywords=odysseus;ui;agent;llm;7000;menu;start;stop;restart;status;
+Actions=Toggle;Start;Stop;Restart;Status;Logs;Browse;
+
+[Desktop Action Toggle]
+Name=Toggle Start/Stop
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh toggle
+
+[Desktop Action Start]
+Name=Start Odysseus
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh start
+
+[Desktop Action Stop]
+Name=Stop Odysseus
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh stop
+
+[Desktop Action Restart]
+Name=Restart Odysseus
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh restart
+
+[Desktop Action Status]
+Name=Show Status
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh status
+
+[Desktop Action Logs]
+Name=View Logs
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh logs
+
+[Desktop Action Browse]
+Name=Open Web UI
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh browse

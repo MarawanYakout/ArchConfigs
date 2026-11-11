@@ -1,0 +1,3 @@
+#!/bin/sh
+# Laslo lives in ~/.local/lib/laslo next to the ONNX Runtime CUDA libraries it loads at runtime.
+exec "$HOME/.local/lib/laslo/laslo" "$@"

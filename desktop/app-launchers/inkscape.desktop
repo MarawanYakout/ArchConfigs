@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Inkscape
+Comment=Vector graphics editor
+Exec=/home/leonardo/aur-builds/inkscape/Inkscape-1.4.4.AppImage %F
+Icon=inkscape
+Terminal=false
+Categories=Graphics;2DGraphics;VectorGraphics;

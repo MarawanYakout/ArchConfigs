@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Vim (Alacritty)
+GenericName=Text Editor
+Exec=alacritty -e vim %F
+Terminal=false
+Type=Application
+MimeType=text/plain;

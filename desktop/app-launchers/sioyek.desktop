@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Sioyek
+Comment=PDF Viewer for Research
+Exec=/home/leonardo/aur-builds/sioyek/Sioyek-x86_64.AppImage %f
+Terminal=false
+Categories=Office;Viewer;

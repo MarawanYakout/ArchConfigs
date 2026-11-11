@@ -1,0 +1,15 @@
+configuration {
+    modi: "drun,run,tor:~/.config/rofi/tor-toggle.sh,iphone:~/.config/rofi/iphone-net-toggle.sh";
+
+    filebrowser {
+        directory: "/home/leonardo";
+    }
+
+    recursivebrowser {
+        directory: "/home/leonardo";
+    }
+}
+
+//@theme "/usr/share/rofi/themes/DarkBlue.rasi"
+
+@theme "/usr/share/rofi/themes/material.rasi"

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tor Toggle
+GenericName=Tor on/off switch
+Comment=Start or stop the Tor service
+Exec=/home/leonardo/.config/rofi/tor-toggle.sh toggle
+Icon=network-vpn
+Terminal=false
+Categories=Network;Security;
+Keywords=tor;vpn;proxy;anonymity;toggle;on;off;

@@ -1,0 +1,78 @@
+#!/bin/bash
+# iphone-net — control the iPhone USB tether (ipheth) network interface.
+# Actions: on | off | toggle | status
+# Installed root-owned; invoked from the desktop entry via sudo -n.
+
+set -uo pipefail
+
+find_iface() {
+    local d drv
+    for d in /sys/class/net/*; do
+        [ -e "$d/device/driver" ] || continue
+        drv=$(basename "$(readlink -f "$d/device/driver")" 2>/dev/null)
+        if [ "$drv" = "ipheth" ]; then
+            basename "$d"
+            return 0
+        fi
+    done
+    return 1
+}
+
+admin_up() {
+    local flags
+    flags=$(ip -o link show "$1" 2>/dev/null | sed -n 's/.*<\([^>]*\)>.*/\1/p')
+    case ",$flags," in *,UP,*) return 0 ;; *) return 1 ;; esac
+}
+
+has_default_route() {
+    ip route show default dev "$1" 2>/dev/null | grep -q .
+}
+
+report() {
+    local i=$1 addr
+    addr=$(ip -4 -br addr show "$i" 2>/dev/null | awk '{print $3}')
+    if admin_up "$i"; then
+        if has_default_route "$i"; then
+            echo "ON  — $i ${addr:-no address} — carrying default route"
+        else
+            echo "ON  — $i ${addr:-waiting for DHCP} — not the default route"
+        fi
+    else
+        echo "OFF — $i is down"
+    fi
+}
+
+iface=$(find_iface) || {
+    echo "No iPhone USB interface found. Plug the iPhone in and trust the computer."
+    exit 2
+}
+
+case "${1:-status}" in
+    on)
+        ip link set "$iface" up || exit 1
+        networkctl reconfigure "$iface" >/dev/null 2>&1
+        # give DHCP a moment so the notification shows a real address
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            ip -4 -br addr show "$iface" | awk '{print $3}' | grep -q . && break
+            sleep 0.5
+        done
+        report "$iface"
+        ;;
+    off)
+        ip link set "$iface" down || exit 1
+        report "$iface"
+        ;;
+    toggle)
+        if admin_up "$iface"; then exec "$0" off; else exec "$0" on; fi
+        ;;
+    status)
+        report "$iface"
+        ;;
+    iface)
+        echo "$iface"
+        ;;
+    *)
+        echo "usage: ${0##*/} {on|off|toggle|status|iface}" >&2
+        exit 64
+        ;;
+esac

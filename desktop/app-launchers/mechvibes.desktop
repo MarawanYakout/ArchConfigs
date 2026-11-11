@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Mechvibes
+GenericName=Keyboard Sound Simulator
+Comment=Mechanical keyboard sound simulator
+Exec=/home/leonardo/.local/bin/mechvibes %u
+Icon=mechvibes
+Terminal=false
+Categories=AudioVideo;Utility;
+Keywords=keyboard;sound;mechanical;simulator;
+StartupNotify=true
+MimeType=x-scheme-handler/mechvibes;application/x-mechvibes-theme;

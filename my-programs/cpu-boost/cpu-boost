@@ -1,0 +1,66 @@
+#!/bin/bash
+# cpu-boost {full|low|off|status|reapply}
+#
+# On battery this laptop's firmware holds the CPU at ~5 W (measured 3 W APU,
+# 1.1 GHz under full load; on the charger it allows ~54 W). This raises the
+# limits while on battery:
+#   full  heavy work (compiling, rendering)
+#   low   light work (browser, editor) - smooth, gentler on the battery
+#   off   hand the limits back to the firmware
+#
+# Root-owned in /usr/local/bin. leonardo may run full/low/off/status via sudo
+# without a password (/etc/sudoers.d/10-cpu-boost). udev calls "reapply" when
+# the charger is plugged or unplugged (/etc/udev/rules.d/90-cpu-boost.rules).
+set -u
+FULL_SPL=25; FULL_SPPT=35   # watts: sustained / short bursts
+LOW_SPL=12;  LOW_SPPT=15
+
+W=/sys/devices/platform/asus-nb-wmi
+PP=/sys/firmware/acpi/platform_profile
+STATE=/run/cpu-boost.mode   # "full" or "low"; missing = off. tmpfs, so off after reboot
+
+on_ac() { [ "$(cat /sys/class/power_supply/AC0/online 2>/dev/null)" = 1 ]; }
+
+limits() {
+    case $1 in
+        full) echo "$FULL_SPL $FULL_SPPT" ;;
+        low)  echo "$LOW_SPL $LOW_SPPT" ;;
+        *)    return 1 ;;
+    esac
+}
+
+apply() {
+    local spl sppt
+    read -r spl sppt <<<"$(limits "$1")" || return 1
+    echo "$spl" > "$W/ppt_pl1_spl" && echo "$sppt" > "$W/ppt_pl2_sppt"
+}
+
+# The firmware re-applies its own limits when the platform profile changes,
+# so step to another profile and back.
+firmware_limits() {
+    local cur p
+    cur=$(cat "$PP")
+    for p in $(cat "${PP}_choices"); do
+        [ "$p" != "$cur" ] && { echo "$p" > "$PP"; break; }
+    done
+    sleep 1
+    echo "$cur" > "$PP"
+}
+
+case "${1:-status}" in
+    full|low)
+        echo "$1" > "$STATE"
+        read -r spl sppt <<<"$(limits "$1")"
+        if on_ac; then echo "$1 - takes effect when you unplug the charger"
+        else apply "$1" && echo "$1 - CPU limit ${spl} W (bursts ${sppt} W)"; fi ;;
+    off)
+        rm -f "$STATE"
+        firmware_limits && echo "off - firmware limits restored" ;;
+    status)
+        cat "$STATE" 2>/dev/null || echo off ;;
+    reapply)
+        mode=$(cat "$STATE" 2>/dev/null) || exit 0
+        if on_ac; then firmware_limits; else apply "$mode"; fi ;;
+    *)
+        echo "usage: cpu-boost full|low|off|status" >&2; exit 2 ;;
+esac

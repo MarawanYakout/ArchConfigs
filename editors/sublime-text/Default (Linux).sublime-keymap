@@ -1,0 +1,77 @@
+[
+    // ManimGL workflow (see Packages/User/manim_gl.py). These only apply in
+    // Python files of a project with a .venv-gl folder; elsewhere ctrl+p,
+    // ctrl+shift+p, ctrl+a, ctrl+r, ctrl+e... keep their usual Sublime meaning.
+    {
+        "keys": ["ctrl+shift+r"], "command": "manim_run_scene",
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+p"], "command": "manim_run_scene", "args": { "mode": "again" },
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+shift+p"], "command": "manim_run_scene", "args": { "mode": "loop" },
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+alt+p"], "command": "manim_run_scene", "args": { "mode": "resume" },
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+a"], "command": "manim_play_all",
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+r"], "command": "manim_checkpoint_paste",
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+alt+r"], "command": "manim_checkpoint_paste", "args": { "skip": true },
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+e"], "command": "manim_export", "args": { "quality": "480p" },
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+shift+e"], "command": "manim_export", "args": { "quality": "4k" },
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    {
+        "keys": ["ctrl+shift+q"], "command": "manim_exit",
+        "context": [
+            { "key": "selector", "operator": "equal", "operand": "source.python" },
+            { "key": "manim_gl_project", "operator": "equal", "operand": true }
+        ]
+    },
+    // Works everywhere, including from inside the terminal panel
+    { "keys": ["ctrl+t"], "command": "manim_toggle_panel" }
+]

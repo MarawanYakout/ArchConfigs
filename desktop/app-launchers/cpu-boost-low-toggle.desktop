@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CPU Boost Low Power Toggle
+GenericName=Battery CPU boost (low power) on/off
+Comment=Light CPU boost on battery for browsing and editing (12 W, bursts 15 W); click again to turn off
+Exec=/home/leonardo/.local/bin/cpu-boost-toggle.sh low
+Icon=power-profile-balanced-symbolic
+Terminal=false
+Categories=System;Settings;
+Keywords=cpu;boost;low;light;eco;power;limit;battery;lag;freeze;toggle;on;off;

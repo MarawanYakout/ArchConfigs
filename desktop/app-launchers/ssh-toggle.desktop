@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=SSH Toggle
+GenericName=SSH server on/off switch
+Comment=Start or stop the SSH server (asks for your password)
+Exec=/home/leonardo/.local/bin/ssh-toggle.sh
+Icon=network-server
+Terminal=false
+Categories=Network;Security;
+Keywords=ssh;sshd;server;remote;toggle;on;off;

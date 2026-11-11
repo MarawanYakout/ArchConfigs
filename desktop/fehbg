@@ -1,0 +1,2 @@
+#!/bin/sh
+feh --no-fehbg --bg-fill '/home/leonardo/Pictures/background/gargantua-black-3840x2160-9621.png' 

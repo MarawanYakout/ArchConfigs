@@ -1,0 +1,105 @@
+# Dunst — system notifications only.
+# Policy: block ALL notifications by default (see [block-everything] at the
+# bottom), then explicitly allow system sources: CLI notify-send (used by the
+# tor/iploc toggles, wifi menu, and other ~/.local/bin scripts) and smartd
+# disk-health alerts. App notifications (Telegram, browsers, ...) stay hidden.
+
+[global]
+    monitor = 0
+    follow = keyboard
+    origin = top-right
+    offset = (12, 40)
+    width = 350
+    height = (0, 300)
+    gap_size = 6
+    padding = 10
+    horizontal_padding = 12
+    frame_width = 2
+    separator_color = frame
+    font = Monospace 11
+    format = "<b>%s</b>\n%b"
+    alignment = left
+    show_age_threshold = 60
+    idle_threshold = 120
+    mouse_left_click = close_current
+    mouse_middle_click = do_action
+    mouse_right_click = close_all
+
+[urgency_low]
+    background = "#1d2021"
+    foreground = "#a89984"
+    frame_color = "#504945"
+    timeout = 5
+
+[urgency_normal]
+    background = "#1d2021"
+    foreground = "#ebdbb2"
+    frame_color = "#458588"
+    timeout = 8
+
+[urgency_critical]
+    background = "#1d2021"
+    foreground = "#fb4934"
+    frame_color = "#cc241d"
+    timeout = 0
+
+# --- Whitelist policy -------------------------------------------------------
+# Rules are applied in order; later rules override earlier ones.
+
+[block-everything]
+    appname = "*"
+    skip_display = yes
+    history_ignore = yes
+
+[allow-cli-notify-send]
+    # notify-send without -a reports appname "notify-send"
+    appname = "notify-send"
+    skip_display = no
+    history_ignore = no
+
+[allow-system-appname]
+    # scripts that tag themselves with: notify-send -a system ...
+    appname = "system"
+    skip_display = no
+    history_ignore = no
+
+[allow-smartd]
+    appname = "smartd"
+    skip_display = no
+    history_ignore = no
+
+[smartd-ok]
+    # informational / test messages from the disk-health bridge -> green
+    appname = "smartd"
+    msg_urgency = normal
+    frame_color = "#98971a"
+    foreground = "#b8bb26"
+    timeout = 60
+
+[smartd-bad]
+    # real disk problems -> red, stays until dismissed
+    appname = "smartd"
+    msg_urgency = critical
+    frame_color = "#cc241d"
+    foreground = "#fb4934"
+    timeout = 0
+
+[smartd-report-ok]
+    # morning self-test report, all passed -> green, stays until clicked
+    appname = "smartd-report"
+    msg_urgency = normal
+    skip_display = no
+    history_ignore = no
+    frame_color = "#98971a"
+    foreground = "#b8bb26"
+    timeout = 0
+
+[smartd-report-bad]
+    # morning self-test report, a test failed -> red, stays until clicked
+    appname = "smartd-report"
+    msg_urgency = critical
+    skip_display = no
+    history_ignore = no
+    frame_color = "#cc241d"
+    foreground = "#fb4934"
+    timeout = 0

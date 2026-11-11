@@ -1,0 +1,216 @@
+#!/usr/bin/env python3
+"""List and resolve models for the local LLM server (llama-server).
+
+Model keys:
+  <file>.gguf                  GGUF file directly in MODELS_DIR
+  ollama:<name>:<tag>          model pulled with Ollama into MODELS_DIR/ollama-models
+  api:<provider>:<variant>     cloud model from ~/.config/local-llm/api-providers.json
+                               (served on :8080 by local-llm-api-proxy, not llama-server)
+
+Usage:
+  local-llm-models list              print local model keys, one per line
+  local-llm-models resolve KEY       print llama-server model args, one per line
+                                     (exit 1 if missing/unusable; api keys print nothing)
+  local-llm-models label KEY         print a display name for an api: key
+  local-llm-models providers         print "<provider>\\t<label>" lines
+  local-llm-models api-models PROV   print "api:<prov>:<variant>\\t<label>" lines
+  local-llm-models key-file PROV     print the provider's API key file path
+  local-llm-models has-key PROV      exit 0 if that key file holds a key
+"""
+import json
+import sys
+from pathlib import Path
+
+MODELS_DIR = Path("/home/leonardo/Local_LLM")
+OLLAMA_DIR = MODELS_DIR / "ollama-models"
+OLLAMA_PREFIX = "ollama:"
+API_PREFIX = "api:"
+CONFIG_DIR = Path.home() / ".config/local-llm"
+PROVIDERS_FILE = CONFIG_DIR / "api-providers.json"
+SECRETS_DIR = CONFIG_DIR / "secrets"
+DEFAULT_REGISTRY = "registry.ollama.ai"
+LAYER = "application/vnd.ollama.image."
+
+# Ollama draft-model architecture -> llama-server --spec-type.
+# Drafts with any other architecture are skipped rather than risk a failed start.
+SPEC_TYPES = {
+    "dflash": "draft-dflash",
+    "eagle3": "draft-eagle3",
+    "dspark": "draft-dspark",
+    "mtp": "draft-mtp",
+}
+DRAFT_COMPUTE_MIB = 1536
+
+
+def blob(digest):
+    return OLLAMA_DIR / "blobs" / digest.replace(":", "-")
+
+
+def read_json(path):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def is_gguf(path):
+    try:
+        with path.open("rb") as f:
+            return f.read(4) == b"GGUF"
+    except OSError:
+        return False
+
+
+def ollama_manifests():
+    """Yield (name:tag, manifest path) for every model Ollama has pulled."""
+    root = OLLAMA_DIR / "manifests"
+    if not root.is_dir():
+        return
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        # Layout: manifests/<host>/<namespace>/<model>/<tag>
+        host, *repo, tag = path.relative_to(root).parts
+        if host == DEFAULT_REGISTRY:
+            if repo[:1] == ["library"]:
+                repo = repo[1:]
+        else:
+            repo = [host, *repo]
+        if repo:
+            yield f"{'/'.join(repo)}:{tag}", path
+
+
+def draft_arch(manifest):
+    digest = (manifest.get("config") or {}).get("digest")
+    config = read_json(blob(digest)) if digest else None
+    return ((config or {}).get("draft") or {}).get("architecture")
+
+
+def ollama_args(name, manifest_path):
+    """llama-server args for an Ollama model, or None if llama-server can't load it."""
+    manifest = read_json(manifest_path)
+    if not isinstance(manifest, dict):
+        return None
+    layers = {}
+    for layer in manifest.get("layers", []):
+        if layer.get("digest"):
+            layers.setdefault(layer.get("mediaType", ""), blob(layer["digest"]))
+
+    model = layers.get(LAYER + "model")
+    if model is None or not is_gguf(model):  # skips MLX/safetensors models
+        return None
+    # Blob files are named by hash; --alias gives clients (web UI, /v1/models) a real name.
+    args = ["-m", str(model), "--alias", name]
+
+    projector = layers.get(LAYER + "projector")
+    multimodal = projector is not None and is_gguf(projector)
+    if multimodal:
+        args += ["--mmproj", str(projector)]
+
+    # llama-server's speculative decoding fails on image/audio prompts
+    # ("llama_decode(ctx_dft) failed ... inconsistent sequence positions"),
+    # so the draft is only used for text-only models.
+    draft = layers.get(LAYER + "draft")
+    spec_type = SPEC_TYPES.get(draft_arch(manifest))
+    if draft is not None and spec_type and not multimodal and is_gguf(draft):
+        # --fit can't measure draft memory, so widen its VRAM margin (default 1024 MiB)
+        # by the draft weights plus its compute buffer (~1.2 GiB observed).
+        margin_mib = 1024 + draft.stat().st_size // 2**20 + DRAFT_COMPUTE_MIB
+        args += ["-md", str(draft), "--spec-type", spec_type, "-fitt", str(margin_mib)]
+    return args
+
+
+def list_keys():
+    keys = sorted(
+        p.name for p in MODELS_DIR.glob("*.gguf")
+        if p.is_file() and "mmproj" not in p.name.lower()
+    )
+    keys += [OLLAMA_PREFIX + name for name, path in ollama_manifests() if ollama_args(name, path)]
+    return keys
+
+
+def providers():
+    data = read_json(PROVIDERS_FILE)
+    return data if isinstance(data, dict) else {}
+
+
+def api_variant(key):
+    """(provider, variant) dicts for an api:<provider>:<variant> key, or None."""
+    try:
+        _, provider_id, variant_id = key.split(":", 2)
+        provider = providers()[provider_id]
+        return provider, provider["models"][variant_id]
+    except (ValueError, KeyError, TypeError):
+        return None
+
+
+def key_file(provider_id):
+    provider = providers().get(provider_id)
+    if not provider or not provider.get("key_file"):
+        return None
+    path = (SECRETS_DIR / provider["key_file"]).resolve()
+    return path if SECRETS_DIR.resolve() in path.parents else None
+
+
+def has_key(provider_id):
+    path = key_file(provider_id)
+    try:
+        return any(l.strip() and not l.strip().startswith("#") for l in path.read_text().splitlines())
+    except (OSError, AttributeError):
+        return False
+
+
+def resolve(key):
+    if key.startswith(API_PREFIX):
+        return [] if api_variant(key) else None
+    if key.startswith(OLLAMA_PREFIX):
+        wanted = key[len(OLLAMA_PREFIX):]
+        for name, path in ollama_manifests():
+            if name == wanted:
+                return ollama_args(name, path)
+        return None
+    path = MODELS_DIR / key
+    return ["-m", str(path)] if key and path.is_file() else None
+
+
+def main(argv):
+    if argv[1:] == ["list"]:
+        for key in list_keys():
+            print(key)
+        return 0
+    if len(argv) == 3 and argv[1] == "resolve":
+        args = resolve(argv[2])
+        if args is None:
+            return 1
+        if args:
+            print("\n".join(args))
+        return 0
+    if len(argv) == 3 and argv[1] == "label":
+        found = api_variant(argv[2])
+        if not found:
+            return 1
+        print(f"{found[1].get('label', found[1].get('model'))} (API)")
+        return 0
+    if argv[1:] == ["providers"]:
+        for pid, p in providers().items():
+            print(f"{pid}\t{p.get('label', pid)}")
+        return 0
+    if len(argv) == 3 and argv[1] == "api-models":
+        provider = providers().get(argv[2])
+        if not provider:
+            return 1
+        for vid, v in provider.get("models", {}).items():
+            print(f"{API_PREFIX}{argv[2]}:{vid}\t{v.get('label', v.get('model', vid))}")
+        return 0
+    if len(argv) == 3 and argv[1] == "key-file":
+        path = key_file(argv[2])
+        if not path:
+            return 1
+        print(path)
+        return 0
+    if len(argv) == 3 and argv[1] == "has-key":
+        return 0 if has_key(argv[2]) else 1
+    print(__doc__.strip(), file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

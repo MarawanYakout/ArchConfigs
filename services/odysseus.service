@@ -1,0 +1,18 @@
+[Unit]
+Description=Odysseus UI (on-demand)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/leonardo/aur-builds/odysseus
+EnvironmentFile=-/home/leonardo/aur-builds/odysseus/.env
+Environment=APP_BIND=127.0.0.1
+Environment=APP_PORT=7000
+ExecStart=/home/leonardo/aur-builds/odysseus/.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 7000
+Restart=on-failure
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target

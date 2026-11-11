@@ -1,0 +1,10 @@
+schema = 1
+name = "claude-code"
+description = "Claude Code tool rules: credential paths and commands narrow to self, writes into them require a trusted session, Bash results remain confined for sanitization, and every other Bash and Monitor call is labeled per call by the Claude Code Annotator."
+
+[battery]
+policy = "appa.toml"
+hosts = ["claude-code"]
+namespaces = ["claude-code"]
+helpers = []
+benefit = "Rules for Claude Code's built-in tools: reads of credential files and secret commands stay with you, and a secret-masking sanitizer lets Bash output flow after it masks secrets."

@@ -1,0 +1,47 @@
+[Desktop Entry]
+Type=Application
+Name=Local LLM Menu
+GenericName=Local LLM Manager (small / large)
+Comment=Manage local llama-server on port 8080 (Switch Models, Start, Stop, Restart, Status, Logs)
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh
+Icon=network-server
+Terminal=false
+Categories=Utility;Development;System;
+Keywords=llm;llama;ai;local;server;8080;ellama;menu;start;stop;restart;status;switch;model;large;small;
+Actions=SwitchModel;Switch9B;Switch27B;Toggle;Start;Stop;Restart;Status;Logs;
+
+[DesktopAction SwitchModel]
+Name=Switch Model (Selector)
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh switch
+
+[DesktopAction Switch9B]
+Name=Switch to small model
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh switch-to small
+
+[DesktopAction Switch27B]
+Name=Switch to large model
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh switch-to large
+
+[DesktopAction Toggle]
+Name=Toggle Start/Stop
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh toggle
+
+[DesktopAction Start]
+Name=Start Server
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh start
+
+[DesktopAction Stop]
+Name=Stop Server
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh stop
+
+[DesktopAction Restart]
+Name=Restart Server
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh restart
+
+[DesktopAction Status]
+Name=Show Status
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh status
+
+[DesktopAction Logs]
+Name=View Logs
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh logs

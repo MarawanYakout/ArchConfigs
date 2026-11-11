@@ -1,0 +1,25 @@
+schema = 1
+name = "github"
+description = "Rules for the GitHub MCP server with its default tool sets: profile, repositories, issues, pull requests, and user search; repository visibility decides who may see each read and write, plus the github audience source."
+
+[battery]
+policy = "appa.toml"
+hosts = ["claude-code", "kagent"]
+namespaces = ["github"]
+detect = ["gh"]
+helpers = ["check.py", "audience-source.py", "context.py", "repository-visibility.py", "github_token.py"]
+benefit = "APPA asks GitHub if a repository is public or private, who its collaborators are, and who wrote each issue and pull request. With this, APPA lets private-repository data flow only to its collaborators and marks text from outside authors as suspicious."
+setup = [
+  "Create a classic personal access token at https://github.com/settings/tokens/new with the `repo`, `read:org`, and `user:email` scopes. It starts with `ghp_`.",
+  "To list a repository's collaborators, the token's owner needs push access to that repository.",
+  "For GitHub Enterprise Server, set `GITHUB_API_URL` to its API root, for example `https://github.example.com/api/v3`.",
+]
+
+[battery.readiness]
+command = ["python3", "check.py"]
+required_executables = ["python3"]
+
+[[battery.readiness.cli_alternatives]]
+executable = "gh"
+credential = "APPA_PROVIDER_GITHUB_TOKEN"
+login_hint = "gh auth login -s user:email"

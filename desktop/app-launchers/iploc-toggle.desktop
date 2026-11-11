@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=IP Locator Toggle
+GenericName=IP location feeder on/off switch
+Comment=Start or stop the public IP / location feeder in the i3 bar
+Exec=/home/leonardo/.local/bin/iploc-toggle.sh
+Icon=network-workgroup
+Terminal=false
+Categories=Network;
+Keywords=ip;location;locator;geoip;toggle;on;off;

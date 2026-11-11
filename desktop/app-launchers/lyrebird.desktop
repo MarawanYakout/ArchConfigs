@@ -1,0 +1,11 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Type=Application
+Name=Lyrebird
+GenericName=Voice Changer
+Icon=/home/leonardo/.local/share/lyrebird/icon.png
+Exec=/home/leonardo/.local/bin/lyrebird
+Path=/home/leonardo/.local/share/lyrebird/
+Terminal=false
+Categories=AudioVideo;Audio;

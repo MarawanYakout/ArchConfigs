@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Local LLM Toggle
+GenericName=Local LLM on/off switch
+Comment=Toggle start or stop for local llama-server (port 8080)
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh toggle
+Icon=network-server
+Terminal=false
+Categories=Utility;Development;System;
+Keywords=llm;llama;ai;local;server;8080;ellama;toggle;on;off;large;small;

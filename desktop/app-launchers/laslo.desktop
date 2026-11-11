@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Laslo
+GenericName=Speak highlighted text
+Comment=Highlight text, press Ctrl+Alt+/ to hear it. Launch again to turn Laslo off.
+Exec=/home/leonardo/.local/bin/laslo toggle
+Icon=laslo
+Terminal=false
+Categories=Utility;Accessibility;
+StartupNotify=false

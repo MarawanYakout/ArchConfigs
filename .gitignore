@@ -1,0 +1,30 @@
+# Files that never go to GitHub.
+
+# --- private ---
+my-programs/secreport/state/
+apps/local-llm/secrets/
+apps/local-llm/active_model
+apps/screen-recorder/last
+terminal/htop/htop_history
+
+# --- junk: caches, build output, backups ---
+.appa/
+__pycache__/
+*.pyc
+*.bak
+*.bak-*
+my-programs/secreport/secreport
+Terminus.hidden-color-scheme
+Package Control.user-ca-bundle
+Package Control.cache/
+mimeinfo.cache
+publish.sh
+
+# --- nested git repo (kickstart.nvim clone) ---
+editors/nvim/.git
+
+# --- launchers that other programs generate (WayDroid, Wine, Lutris) ---
+desktop/app-launchers/wine/
+desktop/app-launchers/waydroid.*.desktop
+desktop/app-launchers/Call of Duty.desktop
+desktop/app-launchers/The Witcher 3*.desktop

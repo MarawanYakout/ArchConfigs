@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Power Mode
+GenericName=Power profile switcher
+Comment=Switch between Performance, Balanced, and Power-Saver profiles
+Exec=/home/leonardo/.local/bin/powermenu.sh
+Icon=battery
+Terminal=false
+Categories=System;Settings;
+Keywords=power;profile;performance;balanced;saver;battery;mode;

@@ -1,0 +1,10 @@
+[Unit]
+Description=Ethernet sharing feeder for i3bar (/tmp/share.txt)
+
+[Service]
+ExecStart=%h/.local/bin/sharemon.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

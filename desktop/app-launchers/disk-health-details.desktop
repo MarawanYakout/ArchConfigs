@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Disk Health Details
+GenericName=Full SMART data viewer
+Comment=Full SMART attributes and self-test log for every NVMe drive
+Exec=alacritty -T "Disk Health Details" -e sudo /usr/local/bin/disk-health-details.sh
+Icon=drive-harddisk
+Terminal=false
+Categories=System;Monitor;
+Keywords=disk;health;smart;nvme;ssd;details;wear;temperature;attributes;

@@ -1,0 +1,17 @@
+[Desktop Entry]
+Type=Application
+Name=Waydroid
+GenericName=Android Container
+Comment=Run Android apps in a containerized environment (X11: wrapped in cage)
+Exec=/home/leonardo/.local/bin/waydroid-launch
+Icon=waydroid
+Terminal=false
+Categories=System;Emulator;
+Keywords=android;waydroid;emulator;expo;
+StartupNotify=true
+Actions=stop;
+
+[Desktop Action stop]
+Name=Stop Waydroid
+Exec=waydroid session stop
+Icon=waydroid

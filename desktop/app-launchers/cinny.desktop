@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Cinny
+Comment=A Matrix client
+Exec=/home/leonardo/aur-builds/cinny/cinny-launcher.sh
+Icon=/home/leonardo/aur-builds/cinny/public/res/svg/cinny.svg
+Terminal=false
+Type=Application
+Categories=Network;InstantMessaging;

@@ -1,0 +1,1 @@
+root=PARTUUID=d0211e7e-4118-4938-b49d-05fa04daae5d zswap.enabled=0 rw rootfstype=ext4 lsm=landlock,lockdown,yama,integrity,apparmor,bpf tsc=nowatchdog

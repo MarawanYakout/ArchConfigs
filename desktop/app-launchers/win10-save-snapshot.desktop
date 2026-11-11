@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Save Windows 10 VM Snapshot
+Comment=Save current live state of Windows 10 VM for instant 1-second boots
+Exec=/home/leonardo/.local/bin/save-win10-snapshot.sh
+Icon=camera-photo
+Terminal=false
+Type=Application
+Categories=System;Emulator;Utility;
+Keywords=snapshot;save;windows;win10;vm;qemu;

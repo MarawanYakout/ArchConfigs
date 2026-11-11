@@ -1,0 +1,3 @@
+# Let leonardo switch the battery CPU boost from rofi drun without a password.
+# Fixed arguments only.
+leonardo ALL=(root) NOPASSWD: /usr/local/bin/cpu-boost full, /usr/local/bin/cpu-boost low, /usr/local/bin/cpu-boost off, /usr/local/bin/cpu-boost status

@@ -1,0 +1,54 @@
+# Lines configured by zsh-newuser-install
+HISTFILE=~/.histfile
+HISTSIZE=3000
+SAVEHIST=3000
+# End of lines configured by zsh-newuser-install
+# The following lines were added by compinstall
+zstyle :compinstall filename '/home/leonardo/.zshrc'
+
+autoload -Uz compinit
+compinit
+# End of lines added by compinstall
+export EDITOR=nvim
+eval "$(atuin init zsh)"
+
+#Aliaces for me
+alias obsed='~/aur-builds/obsidian/Obsidian-1.12.7.AppImage &'
+alias sio='~/aur-builds/sioyek/Sioyek-x86_64.AppImage &'
+alias zot='~/aur-builds/zotero/zotero &'
+#emacs installation
+export PATH="$HOME/.config/emacs/bin:$PATH"
+
+
+# Added by Antigravity CLI installer
+export PATH="/home/leonardo/.local/bin:$PATH"
+export PATH="/home/leonardo/.local/bin:$PATH"
+export PATH="$HOME/.bun/bin:$PATH"
+
+# WayDroid + Expo helper (added by claude 2026-07-15)
+# expo-open [ip]  -> deep-links the running Metro project into Expo Go on WayDroid, no manual URL typing
+expo-open() {
+  local ip="${1:-$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')}"
+  adb -s <waydroid-ip>:5555 shell am start -a android.intent.action.VIEW -d "exp://${ip}:8081"
+}
+
+eval "$(zoxide init --cmd cd zsh)"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.cargo/bin:$PATH"
+
+#for the courseradl git repo
+coursera() {
+  /home/leonardo/aur-builds/coursera-dl/.venv/bin/python \
+    /home/leonardo/aur-builds/coursera-dl/coursera-dl \
+    --cauth "$(<~/.config/coursera-dl/cauth)" \
+    --video-resolution 720p \
+    --subtitle-language en \
+    --download-quizzes \
+    --download-notebooks \
+    --mathjax-cdn "https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js" \
+    --path "/home/leonardo/Library/Coursera Videos" \
+    "$@"
+}

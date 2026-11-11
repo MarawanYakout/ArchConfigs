@@ -1,0 +1,3 @@
+# Let leonardo drive the iPhone USB tether toggle without a password prompt,
+# so it can be launched from rofi drun with no terminal attached.
+leonardo ALL=(root) NOPASSWD: /usr/local/bin/iphone-net

@@ -1,0 +1,3 @@
+# Charger plugged/unplugged: re-apply the CPU boost on battery, or give the
+# firmware its own limits back on AC (only if the boost is switched on).
+SUBSYSTEM=="power_supply", KERNEL=="AC0", ACTION=="change", RUN+="/usr/bin/systemd-run --no-block --on-active=3 /usr/local/bin/cpu-boost reapply"

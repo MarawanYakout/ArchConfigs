@@ -1,0 +1,24 @@
+[Desktop Entry]
+Type=Application
+Name=iPhone Internet
+GenericName=USB Tether Toggle
+Comment=Turn the iPhone USB internet connection on or off
+Exec=/home/leonardo/.local/bin/iphone-net-toggle toggle
+Icon=network-wired
+Terminal=false
+Categories=Network;
+Keywords=iphone;tether;usb;ethernet;internet;toggle;droidcam;
+StartupNotify=false
+Actions=On;Off;Status;
+
+[Desktop Action On]
+Name=Turn On
+Exec=/home/leonardo/.local/bin/iphone-net-toggle on
+
+[Desktop Action Off]
+Name=Turn Off
+Exec=/home/leonardo/.local/bin/iphone-net-toggle off
+
+[Desktop Action Status]
+Name=Show Status
+Exec=/home/leonardo/.local/bin/iphone-net-toggle status

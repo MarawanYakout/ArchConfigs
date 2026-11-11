@@ -1,0 +1,704 @@
+#!/usr/bin/env python3
+"""local-llm-api-proxy - serve the llama.cpp web UI on 127.0.0.1:8080, but answer
+chats with a cloud API model (Local LLM Menu -> Run via API).
+
+Started by start-local-llm when the active model is "api:<provider>:<variant>"
+(providers live in ~/.config/local-llm/api-providers.json). The web UI, Ellama
+and anything else keep using http://127.0.0.1:8080 unchanged.
+
+Security:
+  * listens on 127.0.0.1 only and rejects requests whose Host header is not
+    127.0.0.1/localhost (blocks DNS-rebinding attacks from web pages)
+  * CORS answers only localhost origins
+  * requires the same API key as llama-server (secrets/llama-server.key) for
+    everything except UI files, /health and /v1/models
+  * the provider's API key is read per request from secrets/<provider>/...,
+    sent only to that provider's base_url (HTTPS required unless loopback),
+    and never logged or returned
+  * web tools (/tools, same contract as llama-server) run in the bwrap sandbox
+    via local-llm-mcp-run, and the web UI asks before every tool call
+"""
+import argparse
+import http.client
+import ipaddress
+import json
+import mimetypes
+import queue
+import secrets
+import select
+import ssl
+import subprocess
+import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlsplit
+
+CONFIG_DIR = Path.home() / ".config/local-llm"
+SECRETS_DIR = CONFIG_DIR / "secrets"
+PROVIDERS_FILE = CONFIG_DIR / "api-providers.json"
+# Editable instructions added to chat requests that offer the use_obsidian tools
+TOOL_GUIDANCE_FILE = CONFIG_DIR / "tool-guidance.md"
+SERVER_KEY_FILE = SECRETS_DIR / "llama-server.key"
+# Patched UI from local-llm-build-ui (approval card shows tool arguments), else upstream's
+PATCHED_UI_DIR = Path.home() / ".local/share/local-llm/ui-dist"
+UI_DIR = (PATCHED_UI_DIR if (PATCHED_UI_DIR / "index.html").is_file()
+          else Path.home() / "aur-builds/llama.cpp/build/tools/ui/dist")
+
+# Request fields forwarded to the provider; llama.cpp-only sampling fields are dropped.
+FORWARD_FIELDS = {"messages", "stream", "max_tokens", "temperature", "top_p", "stop", "tools",
+                  "tool_choice", "parallel_tool_calls", "response_format", "presence_penalty",
+                  "frequency_penalty", "logprobs", "top_logprobs"}
+PUBLIC_PATHS = {"/health", "/v1/health", "/models", "/v1/models"}
+CHAT_PATHS = {"/v1/chat/completions", "/chat/completions"}
+DISABLED_PATHS = {"/cors-proxy"}  # same answer llama-server gives when it's off
+MAX_REQUEST_BYTES = 64 * 2**20
+UPSTREAM_TIMEOUT = 600
+
+# Tools offered to the API model through the web UI (/tools, same contract as
+# llama-server). Each runs sandboxed via local-llm-mcp-run; the web UI asks
+# before every call. ask_deepseek is left out: the API model is already DeepSeek.
+MCP_RUNNER = Path.home() / ".local/bin/local-llm-mcp-run"
+API_MODE_MCP_SERVERS = ("web_search", "use_obsidian")
+WRITE_TOOLS = {"use_obsidian_write_note"}  # reported as permissions.write = true
+MCP_CALL_TIMEOUT = 60
+
+# /props defaults, as reported by llama-server (the web UI reads these)
+DEFAULT_PARAMS = {
+    "seed": 4294967295, "temperature": 0.8, "dynatemp_range": 0.0, "dynatemp_exponent": 1.0,
+    "top_k": 40, "top_p": 0.95, "min_p": 0.05, "top_n_sigma": -1.0, "xtc_probability": 0.0,
+    "xtc_threshold": 0.1, "typical_p": 1.0, "repeat_last_n": 64, "repeat_penalty": 1.0,
+    "presence_penalty": 0.0, "frequency_penalty": 0.0, "dry_multiplier": 0.0, "dry_base": 1.75,
+    "dry_allowed_length": 2, "dry_penalty_last_n": 64, "mirostat": 0, "mirostat_tau": 5.0,
+    "mirostat_eta": 0.1, "max_tokens": -1, "n_predict": -1, "n_keep": 0, "n_discard": 0,
+    "ignore_eos": False, "stream": False, "n_probs": 0, "min_keep": 0, "chat_format": "Content-only",
+    "reasoning_format": "none", "reasoning_in_content": False, "generation_prompt": "",
+    "samplers": ["penalties", "dry", "top_n_sigma", "top_k", "typ_p", "top_p", "min_p", "xtc", "temperature"],
+    "timings_per_token": False, "post_sampling_probs": False, "backend_sampling": False, "lora": [],
+}
+TEMPLATE_CAPS = {
+    "supports_object_arguments": True, "supports_parallel_tool_calls": True,
+    "supports_preserve_reasoning": False, "supports_string_content": True,
+    "supports_system_role": True, "supports_tool_calls": True, "supports_tools": True,
+    "supports_typed_content": False,
+}
+
+
+def is_loopback_host(host):
+    if host in ("localhost",) or (host or "").endswith(".localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def read_secret(path):
+    try:
+        for line in path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                return line
+    except OSError:
+        pass
+    return None
+
+
+class Upstream:
+    def __init__(self, provider_id, variant_id):
+        providers = json.loads(PROVIDERS_FILE.read_text())
+        provider = providers[provider_id]
+        variant = provider["models"][variant_id]
+        self.provider_id = provider_id
+        self.provider_label = provider.get("label", provider_id)
+        self.model = variant["model"]
+        self.label = variant.get("label", self.model)
+        self.params = variant.get("params", {})
+        self.context_length = int(provider.get("context_length", 131072))
+
+        key_file = (SECRETS_DIR / provider["key_file"]).resolve()
+        if SECRETS_DIR.resolve() not in key_file.parents:
+            raise ValueError("key_file must be inside ~/.config/local-llm/secrets")
+        self.key_file = key_file
+
+        url = urlsplit(provider["base_url"])
+        if url.scheme == "http" and is_loopback_host(url.hostname):
+            self.tls = False
+        elif url.scheme == "https":
+            self.tls = True
+        else:
+            raise ValueError("base_url must be https:// (plain http only for localhost)")
+        self.host = url.hostname
+        self.port = url.port or (443 if self.tls else 80)
+        self.path = url.path.rstrip("/") + "/chat/completions"
+
+    def connect(self):
+        if self.tls:
+            return http.client.HTTPSConnection(self.host, self.port, timeout=UPSTREAM_TIMEOUT,
+                                               context=ssl.create_default_context())
+        return http.client.HTTPConnection(self.host, self.port, timeout=UPSTREAM_TIMEOUT)
+
+
+def add_tool_guidance(body):
+    """If the request offers use_obsidian tools, add tool-guidance.md to its system message
+    (so e.g. "clean the answer" about a note becomes an edit of that note). Returns True if changed."""
+    tools = body.get("tools")
+    msgs = body.get("messages")
+    if not isinstance(tools, list) or not isinstance(msgs, list):
+        return False
+    names = {(t.get("function") or {}).get("name") or "" for t in tools if isinstance(t, dict)}
+    if not any(n.startswith("use_obsidian_") for n in names):
+        return False
+    try:
+        guidance = TOOL_GUIDANCE_FILE.read_text().strip()
+    except OSError:
+        return False
+    if not guidance:
+        return False
+    first = msgs[0] if msgs else None
+    if isinstance(first, dict) and first.get("role") == "system" and isinstance(first.get("content"), str):
+        if guidance in first["content"]:
+            return False
+        msgs[0] = {**first, "content": first["content"].rstrip() + "\n\n" + guidance}
+    else:
+        msgs.insert(0, {"role": "system", "content": guidance})
+    return True
+
+
+def clean_messages(messages):
+    """Make llama.cpp web UI messages acceptable to a plain OpenAI-style text API."""
+    out = []
+    for msg in messages if isinstance(messages, list) else []:
+        if not isinstance(msg, dict):
+            continue
+        m = {k: msg[k] for k in ("role", "content", "name", "tool_calls", "tool_call_id") if msg.get(k) is not None}
+        # DeepSeek requires earlier reasoning on every assistant turn when tools are
+        # in the request (400 otherwise) and ignores it when they aren't.
+        if msg.get("role") == "assistant" and msg.get("reasoning_content"):
+            m["reasoning_content"] = msg["reasoning_content"]
+        content = m.get("content")
+        if isinstance(content, list):
+            texts = [p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"]
+            if len(texts) < len(content):
+                texts.append("[attachment omitted: this API model only accepts text]")
+            m["content"] = "\n".join(t for t in texts if t)
+        out.append(m)
+    return out
+
+
+class McpClient:
+    """One sandboxed MCP server (local-llm-mcp-run <name>), spoken to over stdio.
+
+    A dedicated long-lived worker thread owns the subprocess: bwrap's
+    --die-with-parent fires when the *thread* that spawned it exits, so it must
+    not be spawned from a short-lived HTTP request thread. Requests are handled
+    one at a time; the server is started on first use and restarted if it dies.
+    """
+
+    def __init__(self, name):
+        self.name = name
+        self.proc = None
+        self.tools = []
+        self.next_id = 1
+        self.jobs = queue.Queue()
+        threading.Thread(target=self._worker, name=f"mcp-{name}", daemon=True).start()
+
+    @staticmethod
+    def log(msg):
+        sys.stderr.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+
+    def _worker(self):
+        while True:
+            fn, args, reply = self.jobs.get()
+            try:
+                reply.put((True, fn(*args)))
+            except Exception as e:  # handed back to the request thread
+                reply.put((False, e))
+
+    def _submit(self, fn, *args):
+        reply = queue.Queue(maxsize=1)
+        self.jobs.put((fn, args, reply))
+        ok, value = reply.get()
+        if not ok:
+            raise value
+        return value
+
+    def _rpc(self, method, params=None, timeout=MCP_CALL_TIMEOUT):
+        rid = self.next_id
+        self.next_id += 1
+        msg = {"jsonrpc": "2.0", "id": rid, "method": method}
+        if params is not None:
+            msg["params"] = params
+        self.proc.stdin.write(json.dumps(msg) + "\n")
+        self.proc.stdin.flush()
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([self.proc.stdout], [], [], remaining)[0]:
+                self._stop()
+                raise TimeoutError(f"MCP server {self.name} timed out")
+            line = self.proc.stdout.readline()
+            if not line:
+                self._stop()
+                raise RuntimeError(f"MCP server {self.name} exited")
+            reply = json.loads(line)
+            if reply.get("id") == rid:
+                return reply
+
+    def _ensure(self):
+        if self.proc and self.proc.poll() is None:
+            return
+        if self.proc:
+            self.log(f"MCP server {self.name} exited (code {self.proc.returncode}); restarting")
+        self.proc = subprocess.Popen([str(MCP_RUNNER), self.name], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, text=True, bufsize=1)
+        self._rpc("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
+                                 "clientInfo": {"name": "local-llm-api-proxy", "version": "1"}})
+        self.proc.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
+        self.proc.stdin.flush()
+        self.tools = self._rpc("tools/list").get("result", {}).get("tools", [])
+
+    def _stop(self):
+        if self.proc:
+            self.proc.kill()
+            self.proc.wait()
+            self.proc = None
+
+    def _list(self):
+        self._ensure()
+        return list(self.tools)
+
+    def _call(self, tool, params):
+        self._ensure()
+        return self._rpc("tools/call", {"name": tool, "arguments": params})
+
+    def list_tools(self):
+        return self._submit(self._list)
+
+    def call(self, tool, params):
+        reply = self._submit(self._call, tool, params)
+        if "error" in reply:
+            return {"error": reply["error"].get("message", "MCP error")}
+        result = reply.get("result") or {}
+        text = "\n".join(p.get("text", "") for p in result.get("content", []) if p.get("type") == "text")
+        if result.get("isError"):
+            return {"error": text or "tool returned an error"}
+        return {"plain_text_response": text}
+
+
+MCP_SERVERS = {name: McpClient(name) for name in API_MODE_MCP_SERVERS}
+
+
+def tool_listing():
+    """GET /tools entries in llama-server's format (tool ids are <server>_<tool>)."""
+    out = []
+    for server, client in MCP_SERVERS.items():
+        try:
+            tools = client.list_tools()
+        except (OSError, RuntimeError, TimeoutError, ValueError) as e:
+            McpClient.log(f"MCP server {server} unavailable: {e}")
+            continue  # one broken server (e.g. vault missing) shouldn't hide the others
+        for t in tools:
+            tid = f"{server}_{t['name']}"
+            out.append({"display_name": tid, "tool": tid, "type": "mcp",
+                        "permissions": {"write": tid in WRITE_TOOLS},
+                        "uses_cwd": False, "definition": {"type": "function", "function": {
+                            "name": tid, "description": t.get("description", ""),
+                            "parameters": t.get("inputSchema", {"type": "object"})}}})
+    return out
+
+
+def tool_call(tool_id, params):
+    for server, client in MCP_SERVERS.items():
+        if tool_id.startswith(server + "_"):
+            return client.call(tool_id[len(server) + 1:], params)
+    return None
+
+
+HOP_BY_HOP = {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te",
+              "trailers", "transfer-encoding", "upgrade", "host", "content-length"}
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "local-llm-api-proxy"
+    protocol_version = "HTTP/1.1"
+    upstream = None
+    server_key = None
+    port = 8080
+    local_port = None  # local mode: pass everything except UI files to llama-server here
+
+    # ---- helpers -----------------------------------------------------------
+    def log_message(self, fmt, *args):
+        sys.stderr.write("%s %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
+
+    def _cors(self):
+        origin = self.headers.get("Origin")
+        if origin and is_loopback_host(urlsplit(origin).hostname):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+            self.send_header("Vary", "Origin")
+
+    def _send(self, status, body, ctype="application/json", extra=None):
+        data = body if isinstance(body, bytes) else json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        if self.close_connection:
+            self.send_header("Connection", "close")
+        for k, v in (extra or {}).items():
+            self.send_header(k, v)
+        self._cors()
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
+
+    def _error(self, status, message, etype="server_error"):
+        self._send(status, {"error": {"code": status, "message": message, "type": etype}})
+
+    def _host_ok(self):
+        allowed = {f"127.0.0.1:{self.port}", f"localhost:{self.port}", f"[::1]:{self.port}"}
+        if self.port == 80:
+            allowed |= {"127.0.0.1", "localhost", "[::1]"}
+        return (self.headers.get("Host") or "").lower() in allowed
+
+    def _authorized(self):
+        if not self.server_key:
+            return True
+        given = self.headers.get("Authorization") or self.headers.get("X-Api-Key") or ""
+        if given.startswith("Bearer "):
+            given = given[len("Bearer "):]
+        return secrets.compare_digest(given.encode(), self.server_key.encode())
+
+    def _guard(self, path):
+        if not self._host_ok():
+            self._error(403, "invalid Host header", "forbidden")
+            return False
+        if path in PUBLIC_PATHS or (self.command in ("GET", "HEAD") and self._ui_file(path)):
+            return True
+        if not self._authorized():
+            self._error(401, "Invalid API Key", "authentication_error")
+            return False
+        return True
+
+    def _ui_file(self, path):
+        rel = "index.html" if path in ("", "/") else path.lstrip("/")
+        try:
+            target = (UI_DIR / rel).resolve()
+        except (OSError, ValueError):
+            return None
+        root = UI_DIR.resolve()
+        if (target == root or root in target.parents) and target.is_file():
+            return target
+        return None
+
+    def _serve_ui_file(self, target):
+        ctype = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        if target.suffix == ".webmanifest":
+            ctype = "application/manifest+json"
+        cache = "no-cache" if target.name in ("index.html", "sw.js", "build.json") else "public, max-age=3600"
+        self._send(200, target.read_bytes(), ctype, {"Cache-Control": cache})
+
+    # ---- local mode: patched UI here, everything else straight to llama-server --
+    def _local(self):
+        """Serve UI files; pass every other request unchanged to llama-server, which
+        does its own API-key check, CORS and tool handling."""
+        if not self._host_ok():
+            if self.command in ("POST", "PUT", "PATCH"):
+                self._discard_body()
+            return self._error(403, "invalid Host header", "forbidden")
+        if self.command in ("GET", "HEAD"):
+            target = self._ui_file(urlsplit(self.path).path)
+            if target is not None:
+                return self._serve_ui_file(target)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if not 0 <= length <= MAX_REQUEST_BYTES or "chunked" in (self.headers.get("Transfer-Encoding") or "").lower():
+            self.close_connection = True
+            return self._error(411 if length >= 0 else 400, "request body needs a valid Content-Length",
+                               "invalid_request_error")
+        body = self.rfile.read(length) if length else None
+        if body and self.command == "POST" and urlsplit(self.path).path in CHAT_PATHS:
+            try:
+                parsed = json.loads(body)
+                if isinstance(parsed, dict) and add_tool_guidance(parsed):
+                    body = json.dumps(parsed).encode()
+            except ValueError:
+                pass  # not JSON: let llama-server answer it
+        headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP_BY_HOP}
+        conn = http.client.HTTPConnection("127.0.0.1", self.local_port, timeout=UPSTREAM_TIMEOUT)
+        try:
+            conn.request(self.command, self.path, body=body, headers=headers)
+            resp = conn.getresponse()
+        except ConnectionRefusedError:
+            conn.close()
+            return self._error(503, "Loading model", "unavailable_error")  # the web UI retries on 503
+        except (OSError, http.client.HTTPException) as e:
+            conn.close()
+            return self._error(502, f"llama-server error ({e.__class__.__name__})")
+        try:
+            self.send_response(resp.status, resp.reason)
+            for k, v in resp.getheaders():
+                if k.lower() not in HOP_BY_HOP:
+                    self.send_header(k, v)
+            length = resp.getheader("Content-Length")
+            if length is not None:
+                self.send_header("Content-Length", length)
+            else:  # streamed (SSE) or unknown length: end the body by closing
+                self.send_header("Connection", "close")
+                self.close_connection = True
+            self.end_headers()
+            if self.command != "HEAD":
+                while True:
+                    chunk = resp.read1(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True  # client left (stop button / closed tab)
+        finally:
+            conn.close()
+
+    do_PUT = do_DELETE = do_PATCH = _local
+
+    # ---- routes ------------------------------------------------------------
+    def do_OPTIONS(self):
+        if self.local_port:
+            return self._local()
+        if not self._host_ok():
+            return self._error(403, "invalid Host header", "forbidden")
+        self.send_response(204)
+        self._cors()
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers",
+                         "Authorization, Content-Type, X-Api-Key, X-Conversation-Id")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_GET(self):
+        if self.local_port:
+            return self._local()
+        path = urlsplit(self.path).path
+        if not self._guard(path):
+            return
+        up = self.upstream
+        if path in ("/health", "/v1/health"):
+            return self._send(200, {"status": "ok"})
+        if path in ("/models", "/v1/models"):
+            return self._send(200, {
+                "object": "list",
+                "models": [{"name": up.label, "model": up.label, "type": "model",
+                            "capabilities": ["completion"], "details": {"format": "api"}}],
+                "data": [{"id": up.label, "aliases": [up.label], "object": "model",
+                          "owned_by": up.provider_id, "created": int(time.time()),
+                          "meta": {"n_ctx": up.context_length, "n_ctx_train": up.context_length}}],
+            })
+        if path == "/props":
+            return self._send(200, {
+                "default_generation_settings": {"params": DEFAULT_PARAMS, "n_ctx": up.context_length},
+                "total_slots": 1, "model_alias": up.label,
+                "model_path": f"api:{up.provider_id}/{up.model}",
+                "modalities": {"vision": False, "video": False, "audio": False},
+                "endpoint_slots": False, "endpoint_props": False, "endpoint_metrics": False,
+                "ui": True, "ui_settings": {}, "chat_template": "", "chat_template_caps": TEMPLATE_CAPS,
+                "bos_token": "", "eos_token": "", "build_info": "local-llm-api-proxy",
+                "is_sleeping": False, "cors_proxy_enabled": False,
+            })
+        if path == "/tools":
+            try:
+                return self._send(200, tool_listing())
+            except (OSError, RuntimeError, TimeoutError, ValueError) as e:
+                self.log_message("tools unavailable: %s", e)
+                return self._error(503, "web tools are unavailable right now")
+        if path in DISABLED_PATHS:
+            return self._error(403, "not available in API mode", "forbidden")
+        target = self._ui_file(path)
+        if target is None:
+            return self._error(404, "File Not Found", "not_found_error")
+        self._serve_ui_file(target)
+
+    do_HEAD = do_GET
+
+    def _discard_body(self):
+        """Read and drop the request body so it isn't mistaken for the next request."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if 0 <= length <= MAX_REQUEST_BYTES:
+            self.rfile.read(length)
+        else:
+            self.close_connection = True
+
+    def _read_json_body(self):
+        """Return the request's JSON object, or None after sending a 400."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = -1
+        if not 0 < length <= MAX_REQUEST_BYTES:
+            self.close_connection = True
+            self._error(400, "missing or too large request body", "invalid_request_error")
+            return None
+        try:
+            body = json.loads(self.rfile.read(length))
+            if isinstance(body, dict):
+                return body
+        except ValueError:
+            pass
+        self._error(400, "request body is not a JSON object", "invalid_request_error")
+        return None
+
+    def do_POST(self):
+        if self.local_port:
+            return self._local()
+        path = urlsplit(self.path).path
+        reads_body = path in CHAT_PATHS or path == "/tools"
+        if not reads_body:
+            self._discard_body()
+        if not self._guard(path):
+            if reads_body:
+                self.close_connection = True  # body left unread
+            return
+        if path in CHAT_PATHS:
+            return self._chat()
+        if path == "/tools":
+            return self._tools_post()
+        if path == "/v1/streams/lookup":
+            return self._send(200, [])  # no background streams to resume in API mode
+        if path in DISABLED_PATHS:
+            return self._error(403, "not available in API mode", "forbidden")
+        self._error(404, f"{path} is not available in API mode (only chat completions)", "not_found_error")
+
+    def _tools_post(self):
+        body = self._read_json_body()
+        if body is None:
+            return
+        params = body.get("params") if isinstance(body.get("params"), dict) else {}
+        try:
+            result = tool_call(str(body.get("tool") or ""), params)
+        except (OSError, RuntimeError, TimeoutError, ValueError) as e:
+            self.log_message("tool call failed: %s", e)
+            result = {"error": f"tool failed: {e}"}
+        if result is None:
+            return self._error(404, "unknown tool", "not_found_error")
+        self._send(200, result)
+
+    def _chat(self):
+        up = self.upstream
+        body = self._read_json_body()
+        if body is None:
+            return
+
+        out = {k: v for k, v in body.items() if k in FORWARD_FIELDS}
+        out["messages"] = clean_messages(body.get("messages"))
+        out["model"] = up.model
+        add_tool_guidance(out)
+        out.update(up.params)
+        if not isinstance(out.get("max_tokens"), int) or out["max_tokens"] <= 0:
+            out.pop("max_tokens", None)
+        stream = bool(out.get("stream"))
+        if stream:
+            out["stream_options"] = {"include_usage": True}
+
+        api_key = read_secret(up.key_file)
+        if not api_key:
+            return self._error(401, f"No {up.provider_label} API key set. Local LLM Menu -> Run via API -> "
+                                    f"{up.provider_label} -> Paste / change API key.", "authentication_error")
+        conn = up.connect()
+        try:
+            conn.request("POST", up.path, body=json.dumps(out).encode(), headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream" if stream else "application/json",
+            })
+            resp = conn.getresponse()
+            if resp.status != 200:
+                return self._upstream_error(resp)
+            if not stream:
+                return self._send(200, resp.read(), "application/json")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self._cors()
+            self.end_headers()
+            self.close_connection = True
+            while True:
+                line = resp.readline()
+                if not line:
+                    break
+                self.wfile.write(line)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # client went away (stop button / closed tab)
+        except (OSError, http.client.HTTPException) as e:
+            self.log_message("upstream error: %s", e.__class__.__name__)
+            try:
+                self._error(502, f"could not reach {up.provider_label} ({e.__class__.__name__})")
+            except OSError:
+                pass
+        finally:
+            conn.close()
+
+    def _upstream_error(self, resp):
+        up = self.upstream
+        raw = resp.read(256 * 1024)
+        try:
+            detail = json.loads(raw).get("error", {}).get("message", "")
+        except (ValueError, AttributeError):
+            detail = ""
+        hints = {401: "API key rejected. Local LLM Menu -> Run via API -> Paste / change API key.",
+                 402: "insufficient account balance.", 429: "rate limited; wait a bit and retry."}
+        msg = f"{up.provider_label} error {resp.status}"
+        if resp.status in hints:
+            msg += f": {hints[resp.status]}"
+        if detail:
+            msg += f" ({detail[:300]})"
+        self.log_message("upstream HTTP %d", resp.status)
+        self._error(resp.status if 400 <= resp.status < 600 else 502, msg, "upstream_error")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("model_key", nargs="?", help="api:<provider>:<variant> (API mode)")
+    ap.add_argument("--local-upstream", type=int, metavar="PORT",
+                    help="local mode: serve the patched UI and pass all other requests to llama-server on PORT")
+    ap.add_argument("--port", type=int, default=8080)
+    args = ap.parse_args()
+    if bool(args.model_key) == bool(args.local_upstream):
+        ap.error("give either an api:<provider>:<variant> model key or --local-upstream PORT")
+
+    if args.model_key:
+        try:
+            _, provider_id, variant_id = args.model_key.split(":", 2)
+            Handler.upstream = Upstream(provider_id, variant_id)
+        except (ValueError, KeyError, OSError) as e:
+            sys.exit(f"local-llm-api-proxy: bad model key or config ({args.model_key}): {e}")
+    else:
+        Handler.local_port = args.local_upstream
+    if not (UI_DIR / "index.html").is_file():
+        sys.exit(f"local-llm-api-proxy: web UI not found at {UI_DIR}")
+    Handler.server_key = read_secret(SERVER_KEY_FILE)
+    Handler.port = args.port
+
+    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    server.daemon_threads = True
+    if Handler.local_port:
+        print(f"UI proxy: patched web UI on http://127.0.0.1:{args.port}, "
+              f"API -> llama-server on 127.0.0.1:{Handler.local_port}", flush=True)
+    else:
+        up = Handler.upstream
+        print(f"API proxy: {up.label} ({up.provider_label}, model {up.model}) on http://127.0.0.1:{args.port}"
+              f"{'' if Handler.server_key else ' [WARNING: no server API key set]'}", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+
+if __name__ == "__main__":
+    main()

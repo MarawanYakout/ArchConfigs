@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Syncthing Toggle
+GenericName=Syncthing on/off switch
+Comment=Start or stop Syncthing file sync
+Exec=/home/leonardo/.local/bin/syncthing-toggle.sh
+Icon=syncthing
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=syncthing;sync;share;files;toggle;on;off;

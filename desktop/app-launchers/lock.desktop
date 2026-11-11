@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Lock
+GenericName=Lock screen
+Comment=Lock the screen (i3lock with US layout forced for the password)
+Exec=/home/leonardo/.local/bin/safelock.sh
+Icon=system-lock-screen
+Terminal=false
+Categories=System;
+Keywords=lock;screen;lockscreen;i3lock;security;

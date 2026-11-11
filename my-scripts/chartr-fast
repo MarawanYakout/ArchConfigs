@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# chartr-fast — run the chartr cockpit in a real browser instead of the bundled
+# WebKitGTK window.
+#
+# Why this exists: the AppImage's native window is WebKitGTK. On a hybrid-GPU
+# Linux box (NVIDIA dGPU driving the render node, another GPU driving the
+# display) WebKitGTK gives up on its DMABUF renderer and composites every frame
+# through shared memory on the CPU — you can verify it, the web process is
+# launched with WEBKIT_DISABLE_DMABUF_RENDERER=1 that nobody set. xterm.js then
+# renders on the GPU and the result is read back and copied per frame, which is
+# exactly the terminal lag.
+#
+# chartr already ships the escape hatch: the cgo-free `chartr` binary serves the
+# same cockpit over HTTP. Pointed at Chromium it gets real GPU compositing and
+# the xterm.js WebGL renderer works as intended.
+#
+# Usage: chartr-fast [--data-dir DIR] [--port N] [any other chartr flag]
+
+set -e
+
+# The cgo-free cockpit binary. First match wins; CHARTR_BIN overrides.
+find_server() {
+	if [ -n "$CHARTR_BIN" ]; then
+		echo "$CHARTR_BIN"
+		return
+	fi
+	for c in \
+		"$HOME/aur-builds/chartr/chartr-src/bin/chartr" \
+		"$HOME/.local/bin/chartr" \
+		/usr/local/bin/chartr \
+		/usr/bin/chartr; do
+		[ -x "$c" ] && { echo "$c"; return; }
+	done
+	# Anything on PATH, as long as it is not this script.
+	c="$(command -v chartr 2>/dev/null || true)"
+	[ -n "$c" ] && echo "$c"
+}
+
+SERVER="$(find_server)"
+if [ -z "$SERVER" ]; then
+	echo "chartr-fast: could not find the cgo-free \`chartr\` binary." >&2
+	echo "chartr-fast: set CHARTR_BIN=/path/to/chartr, or build it with \`make build\`." >&2
+	exit 1
+fi
+
+# Parse only what we need to own; everything else is passed through untouched.
+PORT=""
+ARGS=""
+have_data_dir=0
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--port)
+		PORT="$2"
+		shift 2
+		;;
+	--port=*)
+		PORT="${1#--port=}"
+		shift
+		;;
+	--data-dir | --data-dir=*)
+		have_data_dir=1
+		if [ "$1" = "--data-dir" ]; then
+			ARGS="$ARGS $1 $2"
+			shift 2
+		else
+			ARGS="$ARGS $1"
+			shift
+		fi
+		;;
+	*)
+		ARGS="$ARGS $1"
+		shift
+		;;
+	esac
+done
+
+# A free port, asked for from the kernel rather than guessed, so two cockpits
+# never collide the way the fixed 8787 default does.
+if [ -z "$PORT" ]; then
+	PORT="$(
+		python3 - <<-'PY' 2>/dev/null || echo 8787
+			import socket
+			s = socket.socket()
+			s.bind(("127.0.0.1", 0))
+			print(s.getsockname()[1])
+			s.close()
+		PY
+	)"
+fi
+
+URL="http://127.0.0.1:$PORT"
+
+# Without an explicit --data-dir the cockpit anchors to the current directory,
+# which is what the plain binary does. Nothing to add.
+[ "$have_data_dir" = 1 ] || true
+
+# shellcheck disable=SC2086
+"$SERVER" --addr "127.0.0.1:$PORT" $ARGS &
+SRV=$!
+
+cleanup() {
+	kill "$SRV" 2>/dev/null || true
+	wait "$SRV" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# Wait for the listener rather than sleeping a guess: the window must never open
+# on a connection-refused page.
+i=0
+while [ "$i" -lt 100 ]; do
+	if (exec 3<>/dev/tcp/127.0.0.1/"$PORT") 2>/dev/null; then
+		exec 3<&- 2>/dev/null || true
+		break
+	fi
+	i=$((i + 1))
+	sleep 0.1
+done
+
+# Chromium in app mode is the closest thing to the native window: no tab strip,
+# no address bar, its own window-manager identity. A separate profile keeps the
+# cockpit out of the operator's real browser session, and --class gives the
+# window a name a tiler can match on.
+BROWSER=""
+for b in chromium chromium-browser google-chrome-stable google-chrome brave vivaldi-stable microsoft-edge-stable; do
+	if command -v "$b" >/dev/null 2>&1; then
+		BROWSER="$b"
+		break
+	fi
+done
+
+if [ -n "$BROWSER" ]; then
+	PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/chartr-fast/browser"
+	mkdir -p "$PROFILE"
+	"$BROWSER" \
+		--app="$URL" \
+		--user-data-dir="$PROFILE" \
+		--class=chartr \
+		--no-first-run \
+		--no-default-browser-check \
+		--disable-features=Translate,MediaRouter \
+		--window-size=1280,840 \
+		>/dev/null 2>&1
+elif command -v firefox >/dev/null 2>&1; then
+	# Firefox has no app mode; a dedicated profile in its own window is as close
+	# as it gets, and it still beats the WebKit path.
+	PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/chartr-fast/firefox"
+	mkdir -p "$PROFILE"
+	firefox --profile "$PROFILE" --new-window "$URL" >/dev/null 2>&1
+else
+	echo "chartr-fast: no browser found; the cockpit is at $URL" >&2
+	wait "$SRV"
+fi

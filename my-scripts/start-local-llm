@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Launch Local LLM with CUDA acceleration & Strict / Low Temperature
+CONFIG_DIR="${HOME}/.config/local-llm"
+MODELS_DIR="/home/leonardo/Local_LLM"
+ACTIVE_MODEL_FILE="${CONFIG_DIR}/active_model"
+MODELS_TOOL="${HOME}/.local/bin/local-llm-models"
+DEFAULT_MODEL="small-model.gguf"
+SERVER_KEY_FILE="${CONFIG_DIR}/secrets/llama-server.key"
+MCP_CONFIG="${CONFIG_DIR}/mcp.json"
+
+mkdir -p "$CONFIG_DIR"
+
+if [ -f "$ACTIVE_MODEL_FILE" ]; then
+    MODEL_NAME=$(tr -d ' \n\r' < "$ACTIVE_MODEL_FILE")
+fi
+
+# Cloud model (Local LLM Menu -> Run via API): serve the same web UI on :8080
+# through local-llm-api-proxy instead of loading a local model.
+case "$MODEL_NAME" in
+    api:*)
+        if "$MODELS_TOOL" resolve "$MODEL_NAME" >/dev/null 2>&1; then
+            echo "Starting API proxy [${MODEL_NAME}] on http://127.0.0.1:8080..."
+            exec "${HOME}/.local/bin/local-llm-api-proxy" "$MODEL_NAME" --port 8080
+        fi
+        MODEL_NAME=""  # unknown API model: fall back to the local default
+        ;;
+esac
+
+# Security: only localhost web pages may call the server (CORS), every API call
+# needs the key in secrets/llama-server.key (blocks other websites / DNS
+# rebinding from using the model or its tools), and MCP tools are loaded from
+# mcp.json (each runs sandboxed via local-llm-mcp-run).
+SECURITY_ARGS=(--cors-origins localhost)
+[ -s "$SERVER_KEY_FILE" ] && SECURITY_ARGS+=(--api-key-file "$SERVER_KEY_FILE")
+[ -f "$MCP_CONFIG" ] && SECURITY_ARGS+=(--mcp-servers-config "$MCP_CONFIG")
+
+# Patched web UI (approval card shows the tool's arguments, e.g. which Obsidian
+# note; file-changing tools can't be "always allowed"). Built by
+# local-llm-build-ui; only used if it was built for this llama-server version.
+# llama-server only serves its *built-in* UI files without the API key, so the
+# patched UI is served by local-llm-api-proxy on :8080, which passes every other
+# request unchanged to llama-server on an internal port.
+PATCHED_UI="${HOME}/.local/share/local-llm/ui-dist"
+INTERNAL_PORT=38080
+LLAMA_VERSION=$(/home/leonardo/.local/bin/llama-server --version 2>&1 | grep -m1 '^version:')
+USE_PATCHED_UI=0
+if [ -f "${PATCHED_UI}/index.html" ] && [ "$(head -n1 "${PATCHED_UI}/.llama-server-version" 2>/dev/null)" = "$LLAMA_VERSION" ]; then
+    USE_PATCHED_UI=1
+else
+    echo "Patched web UI missing or built for another llama-server version; using the built-in UI (run local-llm-build-ui)."
+fi
+
+# Turn the model key (a .gguf filename or ollama:<name>:<tag>) into llama-server
+# args: -m, plus --mmproj / -md for Ollama models that ship a projector or draft.
+resolve_model() {
+    local out
+    out=$("$MODELS_TOOL" resolve "$1") || return 1
+    mapfile -t MODEL_ARGS <<< "$out"
+}
+
+# Fallback if unset or model missing
+if [ -z "$MODEL_NAME" ] || ! resolve_model "$MODEL_NAME"; then
+    MODEL_NAME="$DEFAULT_MODEL"
+    MODEL_ARGS=(-m "${MODELS_DIR}/${MODEL_NAME}")
+fi
+
+LLAMA_ARGS=(
+  "${MODEL_ARGS[@]}"
+  --host 127.0.0.1
+  -fit on
+  -c 32768
+  --temp 0.1
+  --top-p 0.1
+  --top-k 1
+  --repeat-penalty 1.1
+  "${SECURITY_ARGS[@]}"
+  "$@"
+)
+
+echo "Starting Local LLM [${MODEL_NAME}] on http://127.0.0.1:8080 (RTX 3080 GPU accelerated, temp=0.1)..."
+
+if [ "$USE_PATCHED_UI" = 0 ]; then
+    exec /home/leonardo/.local/bin/llama-server "${LLAMA_ARGS[@]}" --port 8080
+fi
+
+# Patched UI: llama-server on the internal port + UI proxy on :8080. If either
+# exits, stop the other and exit non-zero so systemd (Restart=always) restarts both.
+/home/leonardo/.local/bin/llama-server "${LLAMA_ARGS[@]}" --port "$INTERNAL_PORT" &
+llama_pid=$!
+"${HOME}/.local/bin/local-llm-api-proxy" --local-upstream "$INTERNAL_PORT" --port 8080 &
+proxy_pid=$!
+trap 'kill "$llama_pid" "$proxy_pid" 2>/dev/null' TERM INT
+wait -n "$llama_pid" "$proxy_pid"
+status=$?
+kill "$llama_pid" "$proxy_pid" 2>/dev/null
+wait
+echo "llama-server or UI proxy exited (status $status)"
+exit $(( status == 0 ? 1 : status ))

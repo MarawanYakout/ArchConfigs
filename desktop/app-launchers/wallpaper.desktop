@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Wallpaper
+GenericName=Wallpaper picker
+Comment=Pick a wallpaper from ~/Pictures with thumbnails
+Exec=/home/leonardo/.local/bin/wallpaper-menu.sh
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Categories=Settings;
+Keywords=wallpaper;background;desktop;picture;feh;

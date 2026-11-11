@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# local-llm-build-ui - build the patched llama.cpp web UI used on :8080
+# (tool-permission card shows the call's arguments, e.g. the Obsidian note;
+#  file-changing tools can't be "always allowed"; see ui-patch/patch_ui.py).
+#
+# Re-run after updating/rebuilding llama.cpp. The result is stamped with the
+# llama-server version; start-local-llm only serves it when the stamp matches,
+# otherwise it falls back to the UI built into llama-server.
+set -euo pipefail
+
+UI_SRC="${HOME}/aur-builds/llama.cpp/build/tools/ui/ui-src"
+APP_DIR="${HOME}/.local/share/local-llm"
+WORK="${APP_DIR}/ui-build"
+OUT="${APP_DIR}/ui-dist"
+STAMP_FILE=".llama-server-version"
+
+version=$("${HOME}/.local/bin/llama-server" --version 2>&1 | grep -m1 '^version:' || true)
+[ -n "$version" ] || { echo "cannot read llama-server version" >&2; exit 1; }
+[ -d "$UI_SRC/src" ] && [ -d "$UI_SRC/node_modules" ] || { echo "UI source not found in $UI_SRC" >&2; exit 1; }
+
+echo "Copying UI source..."
+rm -rf "$WORK"
+mkdir -p "$WORK"
+tar -C "$UI_SRC" --exclude=./node_modules --exclude=./dist --exclude=./.svelte-kit -cf - . | tar -C "$WORK" -xf -
+ln -s "$UI_SRC/node_modules" "$WORK/node_modules"
+
+echo "Patching..."
+python3 -I "${APP_DIR}/ui-patch/patch_ui.py" "$WORK"
+
+echo "Building (bunx vite build)..."
+rm -rf "${OUT}.new"
+build_number=$(sed -E 's/^version: ([0-9]+).*/\1/' <<< "$version")  # same build.json as upstream
+(cd "$WORK" && LLAMA_UI_OUT_DIR="${OUT}.new" LLAMA_BUILD_NUMBER="$build_number" bunx vite build --logLevel warn)
+[ -f "${OUT}.new/index.html" ] || { echo "build produced no index.html" >&2; exit 1; }
+printf '%s\n' "$version" > "${OUT}.new/${STAMP_FILE}"
+
+rm -rf "${OUT}.old"
+[ -d "$OUT" ] && mv "$OUT" "${OUT}.old"
+mv "${OUT}.new" "$OUT"
+rm -rf "${OUT}.old" "$WORK"
+echo "Patched web UI ready in $OUT ($version). Restart the Local LLM server to use it."

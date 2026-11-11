@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Animated Wallpaper
+GenericName=Animated wallpaper picker
+Comment=Set a looping GIF or video as wallpaper (or stop and go back to static)
+Exec=/home/leonardo/.local/bin/animated-wallpaper.sh
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Categories=Settings;
+Keywords=wallpaper;animated;live;gif;video;mp4;loop;background;

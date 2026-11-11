@@ -1,0 +1,10 @@
+export TERMINAL="alacritty"
+# GTK_IM_MODULE=xim removed 2026-07-13: no XIM server runs on this system, and it
+# froze GTK/WebKit apps (Vargo) for seconds on text-field focus/typing/paste.
+# export GTK_IM_MODULE=xim
+export LIBVA_DRIVER_NAME=radeonsi
+# GDK_BACKEND=x11 added 2026-08-14: this is an X11/i3 session, but cage (WayDroid)
+# leaves /run/user/1000/wayland-0 listening after it wedges. GDK prefers Wayland
+# when that socket exists, connects, then blocks forever in wl_display_roundtrip
+# inside gdk_display_manager_open_display -- GTK apps launch, never draw a window.
+export GDK_BACKEND=x11

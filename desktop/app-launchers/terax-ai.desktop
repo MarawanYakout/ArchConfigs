@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Terax AI
+Exec=/home/leonardo/.local/bin/terax-ai
+Icon=utilities-terminal
+Type=Application
+Categories=Utility;

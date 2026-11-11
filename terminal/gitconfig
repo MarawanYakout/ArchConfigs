@@ -1,0 +1,5 @@
+[user]
+	email = you@example.com
+	name = marawanyakout
+[http]
+	postBuffer = 1073741824

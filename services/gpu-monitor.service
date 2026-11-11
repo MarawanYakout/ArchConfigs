@@ -1,0 +1,11 @@
+[Unit]
+Description=GPU usage feeder for i3bar (/tmp/gpu_usage)
+
+[Service]
+ExecStart=%h/.local/bin/gpu-monitor.sh
+ExecStopPost=/bin/sh -c 'echo off > /tmp/gpu_usage'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

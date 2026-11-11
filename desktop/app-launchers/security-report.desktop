@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Security Report
+GenericName=Full system security check
+Comment=Check ports, connections, processes, logins and startup items; save a timestamped report and show it
+Exec=/home/leonardo/.local/bin/secreport
+Icon=security-high
+Terminal=false
+Categories=System;Security;
+Keywords=security;scan;audit;report;ports;connections;processes;malware;check;

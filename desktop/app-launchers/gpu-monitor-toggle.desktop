@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=GPU Monitor Toggle
+GenericName=GPU usage bar feeder on/off switch
+Comment=Start or stop the GPU usage readout in the i3 bar
+Exec=/home/leonardo/.local/bin/gpu-monitor-toggle.sh
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;
+Keywords=gpu;nvidia;amd;monitor;usage;bar;toggle;on;off;

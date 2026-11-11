@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Torrent Client
+Comment=Download and share files over BitTorrent
+Exec=qbittorrent %U
+Icon=qbittorrent
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;P2P;

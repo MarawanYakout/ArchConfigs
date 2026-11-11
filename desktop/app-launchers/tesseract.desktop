@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Tesseract
+Comment=Matrix chat client
+Exec=/home/leonardo/.local/bin/tesseract.sh %U
+Icon=tesseract
+Type=Application
+Categories=Network;InstantMessaging;Chat;
+Terminal=false
+StartupNotify=true
+StartupWMClass=tesseract-matrix
+MimeType=x-scheme-handler/matrix;

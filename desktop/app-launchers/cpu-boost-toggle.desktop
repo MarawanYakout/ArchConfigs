@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CPU Boost Toggle
+GenericName=Battery CPU boost (full) on/off
+Comment=Full CPU power on battery for heavy work (25 W, bursts 35 W); click again to turn off
+Exec=/home/leonardo/.local/bin/cpu-boost-toggle.sh full
+Icon=power-profile-performance-symbolic
+Terminal=false
+Categories=System;Settings;
+Keywords=cpu;boost;full;power;limit;ppt;battery;performance;speed;lag;freeze;toggle;on;off;

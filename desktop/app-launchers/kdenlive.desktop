@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Kdenlive
+Comment=Video editor
+Exec=/home/leonardo/aur-builds/kdenlive/kdenlive-26.08.1-x86_64.AppImage %F
+Icon=kdenlive
+Terminal=false
+Categories=AudioVideo;AudioVideoEditing;

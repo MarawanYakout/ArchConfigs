@@ -1,0 +1,10 @@
+[Unit]
+Description=Network speed feeder for i3bar (/tmp/netspeed.txt)
+
+[Service]
+ExecStart=%h/.local/bin/netspeed.sh wlan0
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

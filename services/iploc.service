@@ -1,0 +1,10 @@
+[Unit]
+Description=Public IP / location feeder for i3bar (/tmp/iploc.txt)
+
+[Service]
+ExecStart=%h/.local/bin/iploc.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

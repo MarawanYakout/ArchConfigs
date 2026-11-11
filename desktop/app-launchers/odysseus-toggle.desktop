@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Odysseus Toggle
+GenericName=Odysseus on/off switch
+Comment=Start or stop Odysseus UI (port 7000) to free memory when unused
+Exec=/home/leonardo/.local/bin/odysseus-menu.sh toggle
+Icon=applications-internet
+Terminal=false
+Categories=Utility;Development;Network;
+Keywords=odysseus;toggle;on;off;start;stop;7000;

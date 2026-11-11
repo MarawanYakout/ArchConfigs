@@ -1,0 +1,10 @@
+[Unit]
+Description=Battery feeder for i3bar (/tmp/battery)
+
+[Service]
+ExecStart=%h/.local/bin/battery-monitor.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

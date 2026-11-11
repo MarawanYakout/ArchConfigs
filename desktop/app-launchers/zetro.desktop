@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Zotero
+Comment=Launch Zotero
+Exec=/home/leonardo/aur-builds/zotero/zotero
+Icon=utilities-terminal # You can point this to an actual icon file if Zetro has one
+Terminal=false # Set to true if Zetro is a CLI app that needs a terminal window
+Type=Application
+Categories=Utility;

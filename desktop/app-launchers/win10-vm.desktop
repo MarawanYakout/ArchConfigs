@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Windows 10 (VM)
+Comment=Run Windows 10 in QEMU (6GB RAM, 8 vCPUs)
+Exec=/home/leonardo/.local/bin/run-win10.sh
+Icon=preferences-system-windows
+Terminal=false
+Type=Application
+Categories=System;Emulator;Utility;
+Keywords=win;windows;win10;windows10;vm;qemu;

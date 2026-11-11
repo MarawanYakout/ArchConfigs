@@ -1,0 +1,14 @@
+{
+  "deepseek": {
+    "label": "DeepSeek",
+    "base_url": "https://api.deepseek.com",
+    "key_file": "deepseek/api_key",
+    "context_length": 131072,
+    "models": {
+      "v4-pro-thinking": {"model": "deepseek-v4-pro", "label": "DeepSeek V4 Pro (thinking)", "params": {"thinking": {"type": "enabled"}}},
+      "v4-pro": {"model": "deepseek-v4-pro", "label": "DeepSeek V4 Pro (fast, no thinking)", "params": {"thinking": {"type": "disabled"}}},
+      "flash-thinking": {"model": "deepseek-flash", "label": "DeepSeek Flash (thinking)", "params": {"thinking": {"type": "enabled"}}},
+      "flash": {"model": "deepseek-flash", "label": "DeepSeek Flash (fast, no thinking)", "params": {"thinking": {"type": "disabled"}}}
+    }
+  }
+}

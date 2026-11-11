@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Local LLM Switch Model
+GenericName=Switch Local LLM Model
+Comment=Switch active model for local llama-server (small model / large model)
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh switch
+Icon=network-server
+Terminal=false
+Categories=Utility;Development;System;
+Keywords=llm;llama;ai;local;server;8080;ellama;switch;model;large;small;

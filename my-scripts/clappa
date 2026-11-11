@@ -1,0 +1,2 @@
+#!/bin/sh
+exec '/home/leonardo/.local/share/appa/bin/appa' protected-launch --settings '/home/leonardo/.local/share/appa/clappa.settings.json' --data-dir '/home/leonardo/.local/share/appa' -- "$@"

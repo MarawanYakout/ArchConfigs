@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "web_search": {
+      "command": "/home/leonardo/.local/bin/local-llm-mcp-run",
+      "args": [
+        "web_search"
+      ],
+      "timeout_ms": 60000
+    },
+    "deepseek": {
+      "command": "/home/leonardo/.local/bin/local-llm-mcp-run",
+      "args": [
+        "deepseek"
+      ],
+      "timeout_ms": 600000
+    },
+    "use_obsidian": {
+      "command": "/home/leonardo/.local/bin/local-llm-mcp-run",
+      "args": [
+        "use_obsidian"
+      ],
+      "timeout_ms": 60000
+    }
+  }
+}

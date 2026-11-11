@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Obsidian
+Comment=Knowledge base
+Exec=/home/leonardo/aur-builds/obsidian/Obsidian-1.12.7.AppImage
+Icon=obsidian
+Type=Application
+Categories=Office;TextEditor;
+Terminal=false
+MimeType=x-scheme-handler/obsidian;

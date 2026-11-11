@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=chartr
+GenericName=Agent Multiplexer
+Comment=Agent multiplexer with a map of the work
+Exec=/home/leonardo/.local/bin/chartr %U
+Icon=chartr
+Terminal=false
+Categories=Development;IDE;
+Keywords=agent;terminal;multiplexer;wayfinder;
+StartupWMClass=chartr
+StartupNotify=true
+X-AppImage-Version=0.2.1

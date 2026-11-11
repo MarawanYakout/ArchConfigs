@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=WiFi Menu
+GenericName=Wireless network picker
+Comment=Scan, pick, and log into wifi networks
+Exec=/home/leonardo/.local/bin/wifi-menu.sh
+Icon=network-wireless
+Terminal=false
+Categories=Network;Settings;
+Keywords=wifi;wireless;network;connect;iwd;ssid;password;

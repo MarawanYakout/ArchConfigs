@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Local LLM Run via API
+GenericName=Run a cloud model (DeepSeek, ...) in the local web UI
+Comment=Pick an API provider and model; served on http://127.0.0.1:8080 like the local models
+Exec=/home/leonardo/.local/bin/local-llm-menu.sh api
+Icon=network-server
+Terminal=false
+Categories=Utility;Development;Network;
+Keywords=llm;api;deepseek;cloud;remote;model;8080;ai;

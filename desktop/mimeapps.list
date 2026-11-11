@@ -1,0 +1,22 @@
+[Default Applications]
+text/plain=nvim.desktop
+image/jpeg=feh.desktop
+image/png=feh.desktop
+x-scheme-handler/obsidian=obsidian.desktop
+text/html=emacs.desktop
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+application/octet-stream=feh.desktop
+image/vnd.ms-dds=feh.desktop
+application/pdf=sioyek.desktop
+x-scheme-handler/jetbrains=jetbrainsd.desktop
+x-scheme-handler/mechvibes=mechvibes-url-handler.desktop
+application/x-mechvibes-theme=mechvibes-url-handler.desktop
+
+[Added Associations]
+image/jpeg=feh.desktop;
+image/png=feh.desktop;
+text/plain=nvim.desktop;
+text/html=emacs.desktop;
+application/octet-stream=feh.desktop;
+image/vnd.ms-dds=feh.desktop;
+application/pdf=sioyek.desktop;

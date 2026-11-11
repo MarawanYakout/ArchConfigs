@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Blender
+Comment=3D modeling, animation, video editing
+Exec=/home/leonardo/aur-builds/blender/blender-5.2.2-linux-x64/blender %f
+Icon=blender
+Terminal=false
+Categories=Graphics;3DGraphics;

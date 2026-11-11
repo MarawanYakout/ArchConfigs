@@ -1,0 +1,10 @@
+schema = 1
+name = "pagerduty"
+description = "Rules for the PagerDuty-hosted MCP server's 18 tools: internal reads of incidents, schedules, and activity, and every manage_* write reviewed."
+
+[battery]
+policy = "appa.toml"
+hosts = ["claude-code", "kagent"]
+namespaces = ["pagerduty"]
+helpers = []
+benefit = "Rules for the 18 tools of the PagerDuty server: APPA keeps incident, schedule, and activity reads internal, and asks a person before each `manage_*` write."

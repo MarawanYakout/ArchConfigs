@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Toggle GPU (VM / Linux)
+Comment=Switch between NVIDIA driver and VFIO Passthrough and reboot
+Exec=alacritty -e sudo /home/leonardo/.local/bin/toggle-gpu.sh
+Icon=system-reboot
+Terminal=false
+Type=Application
+Categories=System;Utility;
+Keywords=gpu;vfio;passthrough;nvidia;toggle;reboot;vm;

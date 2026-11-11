@@ -1,0 +1,31 @@
+[Desktop Entry]
+Type=Application
+Name=Screen Recorder
+GenericName=GPU Screen Recorder
+Comment=Record screen, an area or a window; pause/stop; quality, frame rate and audio; instant replay (gpu-screen-recorder)
+Exec=/home/leonardo/.local/bin/screen-recorder.sh
+Icon=media-record
+Terminal=false
+Categories=AudioVideo;Video;Recorder;Utility;
+Keywords=quality;fps;record;recorder;screen;capture;video;gpu;replay;clip;obs;screencast;
+Actions=Toggle;ToggleArea;Pause;Stop;SaveReplay;
+
+[Desktop Action Toggle]
+Name=Start/Stop full-screen recording
+Exec=/home/leonardo/.local/bin/screen-recorder.sh toggle
+
+[Desktop Action ToggleArea]
+Name=Start/Stop area recording
+Exec=/home/leonardo/.local/bin/screen-recorder.sh toggle-area
+
+[Desktop Action Pause]
+Name=Pause/Resume recording
+Exec=/home/leonardo/.local/bin/screen-recorder.sh pause
+
+[Desktop Action Stop]
+Name=Stop and save
+Exec=/home/leonardo/.local/bin/screen-recorder.sh stop
+
+[Desktop Action SaveReplay]
+Name=Save instant replay
+Exec=/home/leonardo/.local/bin/screen-recorder.sh save
